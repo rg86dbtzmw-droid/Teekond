@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#101923">
+<title>Teekond</title>
+<style>
+:root{color-scheme:dark;--bg:#101923;--panel:#1b2938;--muted:#a9b8c8;--blue:#66c5ff;--line:#314254}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f8fc;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:620px;margin:auto;padding:18px 16px 32px}.head{display:flex;align-items:center;gap:12px;margin:4px 0 18px}.logo{width:48px;height:48px;border-radius:15px;background:#203d58;display:grid;place-items:center;font-size:25px;color:var(--blue)}
+h1{font-size:24px;margin:0} .sub{color:var(--muted);font-size:13px;margin-top:3px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px;margin:12px 0}
+.speed{text-align:center;padding:22px 10px}.num{font-size:76px;font-weight:700;letter-spacing:-3px;line-height:1.05;font-variant-numeric:tabular-nums}.unit{color:var(--muted);font-size:16px;margin-top:5px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#13202d;border-radius:13px;padding:13px;min-width:0}.label{font-size:12px;color:var(--muted);margin-bottom:7px}.value{font-size:21px;font-weight:650;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.small{font-size:12px;color:var(--muted);margin-top:5px}
+button{font:inherit;border:0;border-radius:12px;padding:14px 12px;background:var(--blue);color:#06131d;font-weight:700;cursor:pointer;width:100%;margin-top:9px}
+button.secondary{background:#2a3a4b;color:#f4f8fc;border:1px solid #40556b}.row{display:flex;gap:8px}.row button{flex:1}.status{color:var(--muted);font-size:13px;line-height:1.45;margin-top:10px}
+a{color:var(--blue)}.coord{font-size:15px;line-height:1.7;overflow-wrap:anywhere}.foot{color:#91a3b5;font-size:11px;line-height:1.5;padding:8px 2px}
+</style>
+</head>
+<body><main>
+<header class="head"><div class="logo">⌁</div><div><h1>Teekond</h1><div class="sub">GPS-kiirus · asukoht · kõrgus</div></div></header>
+<section class="panel speed"><div class="label">GPS-KIIRUS</div><div class="num" id="speed">—</div><div class="unit">km/h</div><div class="small" id="accuracy">Oota GPS-signaali</div></section>
+<section class="panel"><div class="grid">
+<div class="metric"><div class="label">GPS-KÕRGUS</div><div class="value" id="gpsAlt">— m</div></div>
+<div class="metric"><div class="label">BAROMEETER</div><div class="value" id="pressureAlt">—</div><div class="small" id="baroNote">iOS Safari piirang</div></div>
+<div class="metric"><div class="label">LAIUSKRAAD</div><div class="value" id="lat">—</div></div>
+<div class="metric"><div class="label">PIKKUSKRAAD</div><div class="value" id="lon">—</div></div>
+</div></section>
+<section class="panel"><div class="label">KOORDINAADID KRAADIDES, MINUTITES JA SEKUNDITES</div><div class="coord" id="dms">—</div>
+<div class="row"><button class="secondary" id="copy">Kopeeri koordinaadid</button><button class="secondary" id="maps">Ava Apple Maps</button></div>
+<button id="start">Alusta GPS-jälgimist</button><button class="secondary" id="stop" disabled>Peata jälgimine</button>
+<div class="status" id="status">Vajuta „Alusta GPS-jälgimist” ja luba asukoha kasutamine.</div></section>
+<div class="foot">GPS-kõrgus võib kõikuda. iOS-i Safari ei anna veebilehele tavaliselt otsest ligipääsu iPhone'i baromeetriandurile; selle jaoks on vaja natiivset iOS-i rakendust. Kasuta rakendust juhina sõidu ajal ainult ohutult ja ära vaata ekraani liikluses.</div>
+</main>
+<script>
+let watchId=null,last=null;
+const $=id=>document.getElementById(id);
+function dms(v,pos,neg){let a=Math.abs(v),d=Math.floor(a),mf=(a-d)*60,m=Math.floor(mf),s=(mf-m)*60;return `${d}° ${m}′ ${s.toFixed(2)}″ ${v>=0?pos:neg}`}
+function update(p){
+ const c=p.coords; last={lat:c.latitude,lon:c.longitude};
+ $('lat').textContent=c.latitude.toFixed(6)+'°';
+ $('lon').textContent=c.longitude.toFixed(6)+'°';
+ $('dms').textContent=dms(c.latitude,'N','S')+'<br>'+dms(c.longitude,'E','W');
+ // Use textContent above to avoid interpreting dynamic data as HTML
+ $('dms').innerHTML=dms(c.latitude,'N','S')+'<br>'+dms(c.longitude,'E','W');
+ $('speed').textContent=c.speed==null?'—':Math.max(0,c.speed*3.6).toFixed(1);
+ $('gpsAlt').textContent=c.altitude==null?'— m':Math.round(c.altitude)+' m';
+ $('accuracy').textContent=`GPS täpsus ±${Math.round(c.accuracy)} m`+(c.altitudeAccuracy==null?'':` · kõrguse täpsus ±${Math.round(c.altitudeAccuracy)} m`);
+ $('status').textContent='GPS-jälgimine töötab. Hoia leht avatuna.';
+}
+$('start').onclick=()=>{
+ if(!('geolocation' in navigator)){ $('status').textContent='See brauser ei toeta geolokatsiooni.';return;}
+ if(watchId!==null)return;
+ $('status').textContent='Otsin GPS-signaali…';
+ watchId=navigator.geolocation.watchPosition(update,e=>{$('status').textContent='Asukohta ei saanud lugeda: '+e.message+'. Kontrolli Safari asukohaõigusi.';},{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+ $('start').disabled=true;$('stop').disabled=false;
+};
+$('stop').onclick=()=>{if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;$('start').disabled=false;$('stop').disabled=true;$('status').textContent='GPS-jälgimine peatatud.'};
+$('copy').onclick=async()=>{if(!last){$('status').textContent='Kõigepealt alusta GPS-jälgimist.';return}let s=`${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}`;try{await navigator.clipboard.writeText(s);$('status').textContent='Koordinaadid kopeeritud: '+s}catch(e){$('status').textContent='Koordinaadid: '+s}};
+$('maps').onclick=()=>{if(!last){$('status').textContent='Kõigepealt alusta GPS-jälgimist.';return}location.href=`https://maps.apple.com/?ll=${last.lat},${last.lon}&q=Minu%20asukoht`};
+</script></body></html>
